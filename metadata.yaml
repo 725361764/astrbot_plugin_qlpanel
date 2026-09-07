@@ -1,6 +1,5 @@
 name: astrbot_plugin_qlpanel
 display_name: QLpanel-pro
-short_desc: 对接青龙面板的通用签到平台：账号本地存储、按用户隔离运行、定时推送，可扩展任意签到脚本
 desc: |
   QLpanel-pro —— 青龙面板对接·通用签到平台。
 
