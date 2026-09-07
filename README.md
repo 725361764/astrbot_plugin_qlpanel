@@ -1,50 +1,67 @@
-# astrbot_plugin_qlpanel —— 青龙面板对接·签到插件（3D壁纸 + 子比网站）
+# QLpanel-pro —— 青龙面板对接·通用签到平台
 
 **单面板共享架构**：管理员绑定自己的青龙面板，所有用户共用面板上的签到脚本。
-用户上传自己的 Cookie → 自动合并写入青龙环境变量 → 手动或每天定时运行签到脚本 → 运行结果按账号推送给每位用户。
+用户上传自己的 Cookie → **账号只存储在本插件数据目录（本地文件），青龙面板不持久存储任何账号数据** → 运行时按用户**临时注入**自己的数据（用完即删）→ 手动或定时运行签到脚本 → 运行结果按账号精确推送给对应用户。
 
-内置两个签到功能：
-1. 📱 **3D壁纸(3gbizhi)**：所有用户签同一个站，Cookie 合并 `||` 写入 `BIZHI_COOKIE`
-2. 🌐 **子比主题(Zibll)网站**：每位用户绑定**自己的网站**，配置合并写入 `ZIBI_CONFIG`
+内置两个签到功能（平台可继续扩展更多脚本）：
+1. 📱 **3D壁纸(3gbizhi)**：所有用户签同一个站，每个 Cookie 是一个账号
+2. 🌐 **子比主题(Zibll)网站**：每位用户绑定**自己的网站**，每个网站是一个账号
 
 > **每用户可绑定多个账号**：3D壁纸每个 Cookie 是一个账号，子比每个网站是一个账号。
-> `/3d set`、`/zibi set` 均为**追加**，不会覆盖旧账号；`/3d del <序号>`、`/zibi del <序号>` 删除指定账号。
-> 日志推送按账号归属精确隔离：每个用户只收到自己的账号结果。
+> `/3d set`、`/zibi set` 均为**追加**，不会覆盖旧账号；**同一网站可绑定多个账号（不同 Cookie），互不覆盖**；只有「网站 + Cookie」与已有账号完全相同时才提示已绑定、不重复添加。
+> `/3d del <序号>`、`/zibi del <序号>` 删除指定账号。
+> **3D 与子比的定时时间相互独立**：`/3d time` 只影响 3D 签到，`/zibi time` 只影响子比签到，设置个人时间后该功能不再跟随全局。
+> 日志推送按账号归属精确隔离：每个用户只收到自己的账号结果，绝不包含他人数据。
+> **每条命令回复末尾都会附上一句随机每日一言** 💬
+
+## 🔒 v1.0.0 安全重构（本版本核心）
+
+**问题**：旧版把全部账号写入青龙环境变量，面板一运行所有账号全跑、数据互相可见、一损俱损。
+
+**新架构**：
+
+| 项目 | 旧版 | v1.0.0 |
+| --- | --- | --- |
+| 账号存储 | 青龙环境变量 `BIZHI_COOKIE` / `ZIBI_CONFIG`（全局合并） | **仅本地文件 `users.json`**，青龙不存任何账号 |
+| 运行数据 | 面板读取全量环境变量，所有账号全跑 | 运行时**按用户临时注入** `BIZHI_RUN_DATA` / `ZIBI_RUN_DATA`，**只运行你自己的账号**，跑完立即删除 |
+| 数据隔离 | 一个用户能看到全部账号 | 每次只注入触发者/定时目标用户的数据，其他用户不运行、不可见 |
+| 迁移 | 无 | `/ql backup` 导出 → 拷贝备份文件到新服务器 → `/ql restore` 一键恢复 |
+| 运行间隔 | 无（连跑，易风控） | 脚本内每个账号间隔 **3~10 秒随机等待**，按账号数估算耗时并提前告知 |
 
 ## 功能
 
-- 📱 **3D壁纸签到**：内置适配 `3gbizhi.py`（多账号版，环境变量 `BIZHI_COOKIE`，`||` 分隔）
-- 🌐 **子比网站签到**：内置适配 `zibi_check_in.py`（多账号版，环境变量 `ZIBI_CONFIG`，JSON 数组），自动提取 `wordpress_logged_in` 登录态
-- 👥 **每用户多账号**：3D壁纸可绑多个 Cookie、子比可绑多个网站，上传是追加不是覆盖；`/3d me`、`/3d del <序号>` 管理自己的账号
+- 🔒 **账号本地存储**：Cookie 只存插件数据目录 `users.json`，青龙面板不再持久存储，数据更安全
+- 👤 **按用户隔离运行**：每次运行只注入目标用户的账号，其他用户不会被运行、也看不到数据
+- 🕐 **随机间隔防风控**：脚本每个账号间隔 3~10 秒随机等待，开始前按账号数输出预计耗时
+- 💬 **等待提示**：触发运行后立即推送「⏳ 正在运行你的 N 个账号，预计约 X~Y 秒……」，避免误以为没运行
+- 💾 **迁移无忧**：`/ql backup` 导出账号备份文件，拷贝到新服务器后 `/ql restore` 一键恢复
+- 📱 **3D壁纸签到**：内置适配 `3gbizhi.py`（临时环境变量 `BIZHI_RUN_DATA`，JSON 数组）
+- 🌐 **子比网站签到**：内置适配 `zibi_check_in.py`（临时环境变量 `ZIBI_RUN_DATA`，JSON 数组），自动提取 `wordpress_logged_in` 登录态
+- 👥 **每用户多账号 + 去重**：3D壁纸可绑多个 Cookie、子比可绑多个网站；重复 Cookie / 重复网站 / 相同登录态会自动**更新**而不是重复添加
 - 🚀 **一键初始化**：管理员 `/ql init` 自动检测连接、创建定时任务、添加订阅拉取脚本
-- 🔑 **双认证模式**：支持 OpenAPI（Client ID/Secret，推荐）和系统 API（用户名密码）
-- 📎 **上传即注册**：用户上传 Cookie（命令或直接发 txt 文件）
-- 🚀 **一键运行**：`/3d run`、`/zibi run` 触发青龙任务，轮询日志并按账号推送结果
+- 🔑 **OpenAPI 认证**：仅支持 Client ID/Client Secret（`/open/*` 接口），不再支持用户名密码
 - ⏰ **个人定时**：每位用户可自定义签到时间（`/3d time HH:MM`，与子比共用），也可跟随全局
 - 🔔 **推送开关**：每位用户可独立开启/关闭结果推送（`/3d push on/off`）
-- 👥 **多用户隔离**：每位用户只收到自己账号的签到结果，看不到其他用户数据
 - 🔄 **Token 自动续期**：青龙 Token 失效自动重新登录
+- 📖 **分区帮助**：`/ql help` 功能菜单、`/ql help 3d`、`/ql help zibi`、`/ql admin`（仅管理员）——功能分区查看，杜绝普通用户看到管理功能
+- 💬 **每日一言**：每条命令回复末尾随机附一句每日一言
+- 🛡️ **定时防重复**：模块级触发去重（90 秒窗口），即使 AstrBot 残留多个插件实例，同一时间点也只触发一次，不再刷屏重复推送
 
 ## 快速开始（3 步）
 
 ### 1. WebUI 配置面板
 
-在 AstrBot WebUI → 插件管理 → 本插件 → 插件配置中填写：
+在 AstrBot WebUI → 插件管理 → 本插件 → 插件配置中填写（**仅 OpenAPI 认证**）：
 
 | 配置项 | 说明 |
 | --- | --- |
 | `ql_url` | 青龙面板地址，如 `http://127.0.0.1:5700` |
-| `ql_client_id` | **推荐**：青龙 OpenAPI Client ID（系统设置→应用设置→创建应用，权限勾选环境变量/定时任务/脚本） |
+| `ql_client_id` | 青龙 OpenAPI Client ID（系统设置→应用设置→创建应用，权限勾选环境变量/定时任务/脚本） |
 | `ql_client_secret` | 与 Client ID 配对的 Secret（密码框） |
-| `ql_username` | 面板登录用户名（仅在未配置 Client ID 时使用） |
-| `ql_password` | 面板登录密码（仅在未配置 Client ID 时使用，密码框） |
 | `daily_time` | 全局默认定时签到时间（HH:MM，留空禁用），默认 `09:00` |
 | `push_after_run` | 运行后是否推送结果，默认开 |
-| `task_name` | 3D壁纸签到任务名，默认 `3gbizhi签到` |
-| `env_name` | 3D壁纸脚本环境变量名，固定 `BIZHI_COOKIE` |
 
-**认证优先级**：填了 `ql_client_id` 就走 OpenAPI（`/open/*` 接口）；否则走系统 API（`/api/*`）。
-
+> 插件仅走 OpenAPI（`/open/*` 接口），不再支持用户名密码登录。
 > 脚本通过青龙订阅自动拉取（仓库 `https://gitee.com/fiezhu/astrbot_plugin_qlpanel-sql.git`），无需手动上传。
 
 ### 2. 一键初始化
@@ -57,27 +74,35 @@
 
 自动完成：
 - ✅ 检测青龙连接是否正常（失败会引导检查配置）
-- ✅ 创建定时任务 `3gbizhi签到`（命令 `task 3gbizhi.py`）与 `zibi签到`（命令 `task zibi_check_in.py`）
-- ✅ 添加/更新青龙订阅 `astrbot_plugin_qlpanel-sql`（仓库 `https://gitee.com/fiezhu/astrbot_plugin_qlpanel-sql.git`，每天0点自动拉取）
-- ✅ **订阅开启自动添加（autoAddCron + 白名单 `3gbizhi.py|zibi_check_in.py`）**：拉取后脚本自动同步进青龙「脚本管理」并自动创建任务，不再出现"只检测不添加"
+- ✅ **任务与订阅目录一致**：签到任务名 = 脚本文件名（`3gbizhi.py` / `zibi_check_in.py`），命令 = `task fiezhu_astrbot_plugin_qlpanel-sql_master/<脚本>`（与订阅 autoAddCron 自动创建的任务完全一致）；旧版 `3gbizhi签到` / `zibi签到` 任务会自动对齐或删除，不会产生重复任务
+- ✅ 添加/更新青龙订阅 `astrbot_plugin_qlpanel-sql`（仓库 `https://gitee.com/fiezhu/astrbot_plugin_qlpanel-sql.git`，每天0点自动拉取，分支 master）
+- ✅ **订阅开启自动添加（autoAddCron + 白名单 `3gbizhi.py|zibi_check_in.py`）**：拉取后脚本自动同步进青龙「脚本管理」并自动创建任务
 - ✅ 触发订阅拉取，两个脚本自动同步到青龙脚本管理
-- ✅ 检查环境变量 `BIZHI_COOKIE` / `ZIBI_CONFIG`（不存在则在用户上传时自动创建）
+- ✅ 检测并**清理旧版持久化环境变量** `BIZHI_COOKIE` / `ZIBI_CONFIG`（新架构账号只存本地，青龙不再存储）
+- ✅ **检测签到脚本就绪状态**：青龙订阅托管的脚本位于 repo 目录（任务命令 `task fiezhu_astrbot_plugin_qlpanel-sql_master/<脚本>`），**不需要出现在脚本管理**；init 以「任务命令指向订阅仓库」判定就绪，若脚本管理中同时存在同名脚本则进一步比对内容版本（新版读 `BIZHI_RUN_DATA` / `ZIBI_RUN_DATA`），旧版会明确告警并给出替换 Gitee 仓库文件的修复步骤
+
+> ⚠️ **重要：青龙面板里的脚本 = 你 Gitee 仓库里的文件**。
+> 青龙脚本管理中的 `3gbizhi.py` / `zibi_check_in.py` 是通过订阅从你的 Gitee 仓库
+> `https://gitee.com/fiezhu/astrbot_plugin_qlpanel-sql.git` 拉取的，**不是**来自插件包。
+> 升级到 v1.0.0 后，必须把插件包 `scripts/` 下的两个新版脚本（读 `BIZHI_RUN_DATA` / `ZIBI_RUN_DATA`）
+> **上传替换到 Gitee 仓库同名文件**，然后在青龙订阅管理点「运行」重新拉取，
+> 否则青龙里的旧脚本仍会去读 `BIZHI_COOKIE` / `ZIBI_CONFIG` 旧环境变量。
 
 > 若订阅添加失败，插件会给出手动添加订阅的步骤（名称/类型/链接/定时规则）。
-> 手动创建订阅时请勾选「自动添加任务」，白名单填 `3gbizhi.py|zibi_check_in.py`，否则脚本只被检测、不会同步进脚本管理。
+> 手动创建订阅时请勾选「自动添加任务」，白名单填 `3gbizhi.py|zibi_check_in.py`。
 
 ### 3. 用户使用
 
 ```
 # 3D壁纸签到（每个 Cookie 是一个账号，可多次 set 追加）
 /3d set <Cookie>          # 追加一个签到账号（或直接发 txt 文件）
-/3d run                   # 立即运行签到
+/3d run                   # 立即运行签到（只运行你自己的账号）
 /3d me                    # 查看我的所有账号
 /3d del 2                 # 删除我的第 2 个账号
 
 # 子比网站签到（每个网站是一个账号，可多次 set 追加）
 /zibi set <网站地址> <Cookie>
-/zibi run                 # 立即运行签到
+/zibi run                 # 立即运行签到（只运行你自己的网站）
 /zibi del 1               # 删除我的第 1 个网站账号
 
 # 公共设置（两个功能共用）
@@ -85,26 +110,53 @@
 /3d push off              # 关闭结果推送（/zibi push 同样可用）
 ```
 
+### 4. 服务器迁移
+
+```
+# 旧服务器：导出账号备份
+/ql backup
+# 把生成的文件 accounts_backup.json 拷贝到新服务器的插件数据目录
+# 新服务器：
+/ql restore
+```
+
+## 帮助系统（分区查看）
+
+```
+/ql help           功能菜单（所有用户可见，只列分区概览，不含管理员细节）
+/ql help 3d        3D壁纸签到的完整用法（所有用户可见）
+/ql help zibi      子比网站签到的完整用法（所有用户可见）
+/ql help admin     提示管理员后台需 /ql admin（不可见内容）
+/ql admin          管理员后台完整帮助（仅管理员可触发）
+/3d help           直接查看 3D壁纸帮助
+/zibi help         直接查看子比帮助
+```
+
 ## 命令大全
 
-### 管理员命令（/ql）
+### 管理员命令（/ql，仅管理员）
 
 | 命令 | 说明 |
 | --- | --- |
-| `/ql init` | **一键初始化**：检测连接→创建任务→添加订阅拉取脚本 |
-| `/ql bind <地址> <账号> <密码> [任务名]` | 聊天框绑定面板（备用，推荐 WebUI） |
+| `/ql help` | 功能菜单（分区概览） |
+| `/ql help 3d` / `/ql help zibi` | 对应功能的完整帮助 |
+| `/ql admin` | **管理员后台**完整帮助（普通用户无法触发，杜绝偷权限） |
+| `/ql init` | **一键初始化**：检测连接→创建任务→添加订阅拉取脚本→清理旧持久化环境变量 |
+| `/ql bind <地址> <Client ID> <Client Secret>` | 聊天框绑定面板（备用，推荐 WebUI） |
 | `/ql unbind` | 解绑命令绑定的面板（WebUI 配置需去 WebUI 清空） |
-| `/ql status` | 面板状态、认证方式、注册人数、账号数、定时配置 |
-| `/ql env list / add / del` | 面板环境变量管理 |
+| `/ql status` | 面板状态、认证方式、注册人数、账号数、账号存储方式、备份状态 |
+| `/ql backup` | **导出账号备份**（生成 `accounts_backup.json`，含迁移步骤说明） |
+| `/ql restore` | **恢复账号备份**（迁移服务器用，覆盖当前本地账号） |
+| `/ql env list / add / del` | 面板环境变量管理（管理员手动维护用） |
 | `/ql cron list / run / log` | 面板任务管理 |
 
 ### 用户命令（/3d —— 3D壁纸）
 
 | 命令 | 说明 |
 | --- | --- |
-| `/3d set <Cookie>` | **追加**一个签到账号（每个账号发一次，可绑定多个） |
+| `/3d set <Cookie>` | **追加**一个签到账号（每个账号发一次，可绑定多个；**相同 Cookie 重复发送会提示已绑定，不重复添加**） |
 | `/3d set` + 上传 txt 文件 | 文件内容作为 Cookie 追加 |
-| `/3d run` | 立即运行签到（每人只收自己的账号结果） |
+| `/3d run` | 立即运行签到（只运行你自己的账号，先推等待提示再推结果） |
 | `/3d me` | 查看我的所有账号（全局序号/Cookie/时间/推送开关） |
 | `/3d del <序号>` | 删除我的指定账号（不带序号则列出账号） |
 | `/3d time <HH:MM>` | 设置个人签到时间 |
@@ -117,9 +169,9 @@
 
 | 命令 | 说明 |
 | --- | --- |
-| `/zibi set <网站地址> <Cookie>` | **追加**一个网站账号（Cookie 中需含 `wordpress_logged_in`，可绑定多个网站） |
+| `/zibi set <网站地址> <Cookie>` | **追加**一个网站账号（Cookie 中需含 `wordpress_logged_in`，可绑定多个网站；**同一网站重复 set 只更新 Cookie，相同登录态会更新网站地址**，不会产生重复账号） |
 | `/zibi set <网站地址>` + 上传 txt 文件 | Cookie 在文件内容里 |
-| `/zibi run` | 立即运行子比签到（每人只收自己网站的结果） |
+| `/zibi run` | 立即运行子比签到（只运行你自己的网站，先推等待提示再推结果） |
 | `/zibi me` | 查看我的所有网站账号 |
 | `/zibi del <序号>` | 删除我的指定网站账号（不带序号则列出账号） |
 | `/zibi time <HH:MM>` | 设置个人签到时间（与 /3d 共用） |
@@ -132,21 +184,28 @@
 
 ## 运行与推送流程
 
-1. 用户 `/3d set <cookie>`（可多次）→ 插件本地记录（`users.json`），全量合并所有用户的全部 Cookie（`||` 分隔）写入青龙 `BIZHI_COOKIE`
-2. 用户 `/zibi set <网站> <cookie>`（可多次）→ 插件本地记录，合并所有用户的全部 `{"host","cookie"}` 写入青龙 `ZIBI_CONFIG`（JSON 数组，按全局账号顺序）
-3. `/3d run`、`/zibi run` 或定时到点 → 插件分别触发对应青龙任务 → **触发后立即推送一条"等待运行结果"提示** → 轮询日志（遇 `任务结束` 提前结束）
-4. 解析日志中 `【账号N】` 行 → 按全局账号序号聚合，**每个用户只收到属于自己账号的行**（一个用户多个账号合并为一条推送）
-5. 触发者回复也只显示自己的账号结果
+1. 用户 `/3d set <cookie>`（可多次）→ 插件本地记录（`users.json`），**青龙不写入任何环境变量**
+2. 用户 `/zibi set <网站> <cookie>`（可多次）→ 插件本地记录
+3. `/3d run`、`/zibi run` 或定时到点 → 插件**只取出该用户的账号**，临时注入青龙临时环境变量（`BIZHI_RUN_DATA` / `ZIBI_RUN_DATA`，JSON 数组）→ 触发对应青龙任务
+4. **立即推送「⏳ 正在运行你的 N 个账号（每个账号间隔 3~10 秒，预计约 X~Y 秒）……」**，让用户有心理预期
+5. 轮询日志（遇 `====任务结束====` 提前结束）→ 解析 `【账号N】` 行（本地序号 1..N，日志只含该用户账号）→ 按个人推送开关**只向该用户推送他自己的结果**
+6. 运行结束 `finally` **删除临时环境变量**，青龙面板不残留任何账号数据
 
-> 任务查找兼容两种来源：手动创建的任务（名称含 `3gbizhi签到`/`zibi签到`）与订阅自动添加的任务（命令含 `3gbizhi.py`/`zibi_check_in.py`），任一存在均可触发运行。
+> 并发安全：插件内置运行锁，多用户同时 /3d run 会排队逐个执行，不会互相覆盖临时数据。
 
-> 账号序号 = 全局平铺顺序（先用户注册顺序、再账号追加顺序）。用户删除账号后序号会前移，推送按当前顺序自动对应。
+> 任务查找兼容两种来源：手动创建的任务（名称含 `3gbizhi.py`/`zibi_check_in.py`）与订阅自动添加的任务（命令含 `fiezhu_astrbot_plugin_qlpanel-sql_master/3gbizhi.py`），任一存在均可触发运行。
+
+> 定时签到：每天到点后**按用户逐个运行**，只运行到点用户自己的账号，互不影响。
+> **防重复触发**：定时调度带模块级去重（同一时间点 90 秒内只触发一次）。
+> 若升级插件后定时仍出现重复触发/刷屏，说明 AstrBot 里残留了旧插件实例，请**重启 AstrBot**（或在插件管理里确认只有一份 astrbot_plugin_qlpanel）。
 
 ## 数据存储
 
 - `data/plugin_data/astrbot_plugin_qlpanel/panel.json`：命令绑定的面板信息（全局，WebUI 配置优先）
-- `data/plugin_data/astrbot_plugin_qlpanel/users.json`：注册用户列表（uid / cookies[] / zibi_sites[] / origin / 个人时间 / 推送开关），旧版单账号数据自动迁移
-- Cookie 仅写入青龙环境变量与本地文件，机器人回复只显示脱敏摘要
+- `data/plugin_data/astrbot_plugin_qlpanel/users.json`：**所有账号数据**（uid / cookies[] / zibi_sites[] / origin / 个人时间 / 推送开关），旧版单账号数据自动迁移
+- `data/plugin_data/astrbot_plugin_qlpanel/accounts_backup.json`：`/ql backup` 导出的账号备份（迁移用）
+- **青龙面板不持久存储任何账号数据**；每次运行临时注入、运行后删除
+- Cookie 仅存在于本地文件，机器人回复只显示脱敏摘要
 
 ## 青龙要求
 
@@ -162,6 +221,7 @@ astrbot_plugin_qlpanel/
 ├── main.py
 ├── requirements.txt     # aiohttp
 ├── _conf_schema.json
+├── logo.png             # 插件图标（AstrBot 约定 logo.png）
 ├── scripts/3gbizhi.py      # 3D壁纸签到脚本（订阅拉取）
 ├── scripts/zibi_check_in.py # 子比网站签到脚本（订阅拉取）
 └── README.md
