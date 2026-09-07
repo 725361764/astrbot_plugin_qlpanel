@@ -1,6 +1,42 @@
-name: helloworld # 插件唯一识别名，以 astrbot_plugin_ 前缀开头
-display_name: helloworld # 用于展示的名字，可以是方便人类阅读的名字（需要版本 >= v4.5.0，低版本不会报错，请放心填写）
-desc: AstrBot 插件示例。 # 插件简短描述
-version: v1.3.0 # 插件版本号。格式：v1.1.1 或者 v1.1
-author: Soulter # 作者
-repo: https://github.com/Soulter/helloworld # 插件的仓库地址
+name: astrbot_plugin_qlpanel
+display_name: QLpanel-pro
+short_desc: 对接青龙面板的通用签到平台：账号本地存储、按用户隔离运行、定时推送，可扩展任意签到脚本
+desc: |
+  QLpanel-pro —— 青龙面板对接·通用签到平台。
+
+  单面板共享架构：管理员绑定自己的青龙面板，所有用户共用面板上的签到脚本，
+  适合给群友提供签到服务。认证仅支持青龙 OpenAPI（Client ID / Client Secret）。
+
+  🔒 安全架构（v1.0.0）：
+  - 账号数据只存储在插件缓存目录 users.json（本地文件），青龙面板不再持久存储任何账号
+  - 运行时按用户临时注入运行数据（用完即删），只运行你自己的账号，数据严格隔离
+  - 脚本每个账号间隔 3~10 秒随机等待，避免触发风控
+  - /ql backup 导出账号、/ql restore 一键恢复，迁移服务器无缝搬号
+
+  内置签到功能（可继续扩展更多脚本）：
+  - 📱 3D壁纸(3gbizhi)：每个 Cookie 是一个账号，/3d set 追加，可绑定多个
+  - 🌐 子比主题(Zibll)网站：每个网站是一个账号，/zibi set <网站> <Cookie> 追加
+
+  用户能力：
+  - /3d run、/zibi run 立即运行（按账号数估算等待时间，推送只含自己的结果）
+  - 每位用户可自定义签到时间（/3d time）和推送开关（/3d push）
+  - 每条回复末尾附随机每日一言
+
+  管理员：
+  - /ql init 一键初始化（检测连接→创建任务→订阅拉取脚本）
+  - /ql admin 查看管理员后台、/ql backup|restore 账号迁移
+  - /ql env、/ql cron 面板运维
+
+  帮助分区：/ql help（功能菜单）、/ql help 3d、/ql help zibi、/ql admin（仅管理员）。
+version: "1.0.0"
+author: 请叫我大王
+repo: https://github.com/725361764/astrbot_plugin_qlpanel
+category: tools
+astrbot_version: ">=3.4,<5"
+commands:
+  - name: ql
+    desc: QLpanel-pro 总入口（管理员）：help 分区帮助 / admin 管理员后台 / init 初始化 / bind 绑定 / status 状态 / backup 备份 / restore 恢复 / env 环境变量 / cron 定时任务
+  - name: "3d"
+    desc: 3D壁纸签到：set 追加Cookie账号 / run 运行 / me 我的 / del 删除账号 / time 定时 / push 推送开关 / help 帮助
+  - name: zibi
+    desc: 子比网站签到：set 追加网站账号 / run 运行 / me 我的 / del 删除账号 / time 定时 / push 推送开关 / help 帮助

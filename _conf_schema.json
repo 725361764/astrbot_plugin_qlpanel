@@ -1,0 +1,28 @@
+{
+  "ql_url": {
+    "type": "string",
+    "description": "青龙面板地址（如 http://127.0.0.1:5700）。留空则使用聊天框 /ql bind 命令绑定",
+    "default": ""
+  },
+  "ql_client_id": {
+    "type": "string",
+    "description": "青龙 OpenAPI Client ID（青龙 系统设置→应用设置 中创建）。插件仅支持 OpenAPI 认证",
+    "default": ""
+  },
+  "ql_client_secret": {
+    "type": "string",
+    "description": "青龙 OpenAPI Client Secret（与 Client ID 配对）",
+    "default": "",
+    "secret": true
+  },
+  "daily_time": {
+    "type": "string",
+    "description": "每天定时签到时间（HH:MM，留空禁用定时）",
+    "default": "09:00"
+  },
+  "push_after_run": {
+    "type": "bool",
+    "description": "签到运行后是否向注册用户推送结果日志",
+    "default": true
+  }
+}
