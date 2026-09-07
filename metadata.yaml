@@ -32,10 +32,3 @@ author: 请叫我大王
 repo: https://github.com/725361764/astrbot_plugin_qlpanel
 category: tools
 astrbot_version: ">=3.4,<5"
-commands:
-  - name: ql
-    desc: QLpanel-pro 总入口（管理员）：help 分区帮助 / admin 管理员后台 / init 初始化 / bind 绑定 / status 状态 / backup 备份 / restore 恢复 / env 环境变量 / cron 定时任务
-  - name: "3d"
-    desc: 3D壁纸签到：set 追加Cookie账号 / run 运行 / me 我的 / del 删除账号 / time 定时 / push 推送开关 / help 帮助
-  - name: zibi
-    desc: 子比网站签到：set 追加网站账号 / run 运行 / me 我的 / del 删除账号 / time 定时 / push 推送开关 / help 帮助
